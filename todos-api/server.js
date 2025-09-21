@@ -12,23 +12,35 @@ const {HttpLogger} = require('zipkin-transport-http');
 const zipkinMiddleware = require('zipkin-instrumentation-express').expressMiddleware;
 
 const logChannel = process.env.REDIS_CHANNEL || 'log_channel';
-const redisClient = require("redis").createClient({
-  host: process.env.REDIS_HOST || 'localhost',
-  port: process.env.REDIS_PORT || 6379,
-  retry_strategy: function (options) {
-      if (options.error && options.error.code === 'ECONNREFUSED') {
-          return new Error('The server refused the connection');
+const redis = require("redis");
+
+// Configuración moderna de Redis (v4+)
+const redisClient = redis.createClient({
+  url: `redis://${process.env.REDIS_HOST || 'localhost'}:${process.env.REDIS_PORT || 6379}`,
+  socket: {
+    reconnectStrategy: (retries) => {
+      if (retries > 10) {
+        console.log('Redis connection failed after 10 retries');
+        return false;
       }
-      if (options.total_retry_time > 1000 * 60 * 60) {
-          return new Error('Retry time exhausted');
-      }
-      if (options.attempt > 10) {
-          console.log('reattemtping to connect to redis, attempt #' + options.attempt)
-          return undefined;
-      }
-      return Math.min(options.attempt * 100, 2000);
-  }        
+      return Math.min(retries * 100, 2000);
+    }
+  }
 });
+
+// Conectar a Redis
+redisClient.on('error', (err) => console.error('Redis Client Error:', err));
+redisClient.on('connect', () => console.log('Connected to Redis'));
+redisClient.on('ready', () => console.log('Redis client ready'));
+
+// Inicializar conexión
+(async () => {
+  try {
+    await redisClient.connect();
+  } catch (error) {
+    console.error('Failed to connect to Redis:', error);
+  }
+})();
 const port = process.env.TODO_API_PORT || 8082
 const jwtSecret = process.env.JWT_SECRET || "foo"
 
