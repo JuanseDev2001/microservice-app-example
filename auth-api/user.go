@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"github.com/sony/gobreaker"
 
 	jwt "github.com/dgrijalva/jwt-go"
 )
@@ -15,6 +16,16 @@ var allowedUserHashes = map[string]interface{}{
 	"johnd_foo":   nil,
 	"janed_ddd":   nil,
 }
+
+var userAPICircuitBreaker *gobreaker.CircuitBreaker = gobreaker.NewCircuitBreaker(gobreaker.Settings{
+	Name:        "UserAPI",
+	MaxRequests: 3,
+	Interval:    0,
+	Timeout:     5,
+	ReadyToTrip: func(counts gobreaker.Counts) bool {
+		return counts.ConsecutiveFailures > 5
+	},
+})
 
 type User struct {
 	Username  string `json:"username"`
@@ -61,24 +72,29 @@ func (h *UserService) getUser(ctx context.Context, username string) (User, error
 
 	req = req.WithContext(ctx)
 
-	resp, err := h.Client.Do(req)
-	if err != nil {
-		return user, err
-	}
-
-	defer resp.Body.Close()
-	bodyBytes, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return user, err
-	}
-
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return user, fmt.Errorf("could not get user data: %s", string(bodyBytes))
-	}
-
-	err = json.Unmarshal(bodyBytes, &user)
-
-	return user, err
+ result, err := userAPICircuitBreaker.Execute(func() (interface{}, error) {
+	 resp, err := h.Client.Do(req)
+	 if err != nil {
+		 return nil, err
+	 }
+	 defer resp.Body.Close()
+	 bodyBytes, err := ioutil.ReadAll(resp.Body)
+	 if err != nil {
+		 return nil, err
+	 }
+	 if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		 return nil, fmt.Errorf("could not get user data: %s", string(bodyBytes))
+	 }
+	 err = json.Unmarshal(bodyBytes, &user)
+	 if err != nil {
+		 return nil, err
+	 }
+	 return user, nil
+ })
+ if err != nil {
+	 return user, err
+ }
+ return result.(User), nil
 }
 
 func (h *UserService) getUserAPIToken(username string) (string, error) {

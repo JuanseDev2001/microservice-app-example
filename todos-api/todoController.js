@@ -3,14 +3,39 @@ const cache = require('memory-cache');
 const {Annotation, 
     jsonEncoder: {JSON_V2}} = require('zipkin');
 
+const CircuitBreaker = require('opossum');
+
 const OPERATION_CREATE = 'CREATE',
       OPERATION_DELETE = 'DELETE';
+
 
 class TodoController {
     constructor({tracer, redisClient, logChannel}) {
         this._tracer = tracer;
         this._redisClient = redisClient;
         this._logChannel = logChannel;
+
+        // Circuit breaker para publicar en Redis
+        this._redisBreaker = new CircuitBreaker(
+            (message) => {
+                return new Promise((resolve, reject) => {
+                    this._redisClient.publish(this._logChannel, message, (err, reply) => {
+                        if (err) return reject(err);
+                        resolve(reply);
+                    });
+                });
+            },
+            {
+                timeout: 3000, // ms
+                errorThresholdPercentage: 50,
+                resetTimeout: 5000 // ms
+            }
+        );
+        
+        this._redisBreaker.fallback(() => {
+            // Fallback si Redis no responde
+            return 'Redis no disponible';
+        });
     }
 
     // TODO: these methods are not concurrent-safe
@@ -53,13 +78,18 @@ class TodoController {
     _logOperation (opName, username, todoId) {
         this._tracer.scoped(() => {
             const traceId = this._tracer.id;
-            this._redisClient.publish(this._logChannel, JSON.stringify({
+            const message = JSON.stringify({
                 zipkinSpan: traceId,
                 opName: opName,
                 username: username,
                 todoId: todoId,
-            }))
-        })
+            });
+            this._redisBreaker.fire(message)
+                .catch(err => {
+                    // Loguea el error si el breaker está abierto o Redis falla
+                    console.error('Circuit breaker: Redis publish failed', err);
+                });
+        });
     }
 
     _getTodoData (userID) {
