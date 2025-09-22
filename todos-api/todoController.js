@@ -26,9 +26,10 @@ class TodoController {
                 });
             },
             {
-                timeout: 3000, // ms
-                errorThresholdPercentage: 50,
-                resetTimeout: 5000 // ms
+                timeout: 2000, 
+                errorThresholdPercentage: 10, 
+                resetTimeout: 10000, 
+                volumeThreshold: 3 
             }
         );
         
