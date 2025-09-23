@@ -22,6 +22,10 @@ class HttpSecurityConfiguration {
         @Override
         protected void configure(HttpSecurity http) throws Exception {
             http.antMatcher("/**")
+                    .authorizeRequests()
+                    .antMatchers("/users/cache/**").permitAll()  // Allow cache endpoints without authentication
+                    .anyRequest().authenticated()
+                    .and()
                     .addFilterAfter(jwtAuthenticationFilter, BasicAuthenticationFilter.class);
         }
     }

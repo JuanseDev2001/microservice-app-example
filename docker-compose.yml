@@ -8,17 +8,19 @@ services:
   users-api:
     build: ./users-api
     ports:
-      - "8081:8081"
+      - "9081:8081"
     environment:
       - SPRING_PROFILES_ACTIVE=default
       - SERVER_PORT=8081
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
     depends_on:
       - redis
 
   auth-api:
     build: ./auth-api
     ports:
-      - "8080:8080"
+      - "9080:8080"
     environment:
       - AUTH_API_PORT=8080
       - USERS_API_ADDRESS=http://users-api:8081
@@ -29,7 +31,7 @@ services:
   todos-api:
     build: ./todos-api
     ports:
-      - "8082:8082"
+      - "9082:8082"
     environment:
       - TODO_API_PORT=8082
       - JWT_SECRET=foo
@@ -52,7 +54,7 @@ services:
   frontend:
     build: ./frontend
     ports:
-      - "8083:80"
+      - "9083:80"
     environment:
       - VUE_APP_API_URL=http://todos-api:8082
     depends_on:

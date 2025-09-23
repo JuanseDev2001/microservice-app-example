@@ -28,6 +28,13 @@ public class JwtAuthenticationFilter extends GenericFilterBean {
         final HttpServletResponse response = (HttpServletResponse) res;
         final String authHeader = request.getHeader("authorization");
 
+        // Allow cache endpoints without authentication
+        String requestURI = request.getRequestURI();
+        if (requestURI.startsWith("/users/cache/")) {
+            chain.doFilter(req, res);
+            return;
+        }
+
         if ("OPTIONS".equals(request.getMethod())) {
             response.setStatus(HttpServletResponse.SC_OK);
 
