@@ -6,7 +6,7 @@ on:
       vm_ip:
         description: 'VM IP Address'
         required: true
-        default: '74.235.59.51'
+        default: '172.203.138.55'
   push:
     paths:
       - 'frontend/**'
@@ -18,7 +18,7 @@ on:
       - env/staging
 
 env:
-  VM_IP: ${{ github.event.inputs.vm_ip || '74.235.59.51' }}
+  VM_IP: ${{ github.event.inputs.vm_ip || '172.203.138.55' }}
 
 jobs:
   deploy:

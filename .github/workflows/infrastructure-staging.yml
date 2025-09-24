@@ -134,13 +134,33 @@ jobs:
         
         if [ "$RESOURCE_GROUP_EXISTS" = "true" ]; then
           echo "Resource group already exists - cleaning up for fresh deployment"
-          az group delete --name microapp-staging-rg --yes --no-wait
+          
+          # First, try to get and destroy Terraform state cleanly
+          echo "Attempting clean Terraform destroy first..."
+          terraform destroy -var-file="staging.tfvars" -auto-approve || echo "Terraform destroy failed, proceeding with resource group deletion"
+          
+          # Force delete the entire resource group
+          echo "Force deleting resource group..."
+          az group delete --name microapp-staging-rg --yes --force-deletion-types Microsoft.Compute/virtualMachines
+          
           echo "Waiting for resource group deletion to complete..."
-          while [ "$(az group exists --name microapp-staging-rg)" = "true" ]; do
-            echo "Still deleting... waiting 10 seconds"
-            sleep 10
+          timeout_counter=0
+          while [ "$(az group exists --name microapp-staging-rg)" = "true" ] && [ $timeout_counter -lt 30 ]; do
+            echo "Still deleting... waiting 20 seconds (attempt $((timeout_counter + 1))/30)"
+            sleep 20
+            timeout_counter=$((timeout_counter + 1))
           done
-          echo "Resource group deletion completed"
+          
+          if [ "$(az group exists --name microapp-staging-rg)" = "true" ]; then
+            echo "WARNING: Resource group still exists after 10 minutes. Proceeding anyway..."
+          else
+            echo "Resource group deletion completed successfully"
+          fi
+          
+          # Clear any existing Terraform state
+          rm -f terraform.tfstate terraform.tfstate.backup .terraform.lock.hcl
+          rm -rf .terraform/
+          terraform init
         else
           echo "No existing resource group found - proceeding with fresh deployment"
         fi
@@ -281,3 +301,20 @@ jobs:
         echo "Staging environment details:"
         echo "VM IP Address: ${{ env.VM_IP }}"
         echo "SSH Access: ssh azureuser@${{ env.VM_IP }}"
+        
+    - name: Trigger application deployment
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const response = await github.rest.actions.createWorkflowDispatch({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            workflow_id: 'deploy-staging.yml',
+            ref: 'env/staging',
+            inputs: {
+              vm_ip: '${{ env.VM_IP }}'
+            }
+          });
+          
+          console.log(`Successfully triggered deployment pipeline with VM IP: ${{ env.VM_IP }}`);
+          console.log('Deployment pipeline will start automatically in a few seconds...');
