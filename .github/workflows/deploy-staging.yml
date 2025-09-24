@@ -72,29 +72,18 @@ jobs:
           exit 1
         fi
         
-        # Test VM connectivity first
-        echo "Testing VM connectivity..."
-        if ! ping -c 3 ${{ env.VM_IP }}; then
-          echo "ERROR: VM is not reachable via ping"
-          echo "VM IP: ${{ env.VM_IP }}"
+        # Test SSH connectivity (Azure blocks ICMP/ping by default)
+        echo "Testing SSH connectivity to ${{ env.VM_IP }}:22..."
+        if ! timeout 10 bash -c "</dev/tcp/${{ env.VM_IP }}/22"; then
+          echo "ERROR: SSH port 22 is not accessible on ${{ env.VM_IP }}"
           echo "This could mean:"
           echo "1. VM is powered off"
-          echo "2. VM doesn't exist"
-          echo "3. Network Security Group blocks ICMP"
-          echo "4. Wrong subscription/resource group"
+          echo "2. VM doesn't exist" 
+          echo "3. Network Security Group blocks port 22"
+          echo "4. SSH service not running"
           exit 1
         fi
-        
-        # Test SSH port
-        echo "Testing SSH port 22..."
-        if ! timeout 10 bash -c "</dev/tcp/${{ env.VM_IP }}/22"; then
-          echo "ERROR: SSH port 22 is not accessible"
-          echo "This could mean:"
-          echo "1. VM is not running SSH service"
-          echo "2. Network Security Group blocks port 22"
-          echo "3. VM firewall blocks SSH"
-          exit 1
-        fi
+        echo "✅ SSH port 22 is accessible"
         
         # Configure SSH access
         mkdir -p ~/.ssh
