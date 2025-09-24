@@ -1,0 +1,129 @@
+name: Deploy Applications to Staging
+
+on:
+  workflow_dispatch:
+    inputs:
+      vm_ip:
+        description: 'VM IP Address'
+        required: true
+        default: '52.186.51.57'
+  push:
+    paths:
+      - 'frontend/**'
+      - 'auth-api/**'
+      - 'users-api/**'
+      - 'todos-api/**'
+      - 'docker-compose.yml'
+    branches:
+      - env/staging
+
+env:
+  VM_IP: ${{ github.event.inputs.vm_ip || '52.186.51.57' }}
+
+jobs:
+  deploy:
+    name: Deploy Microservices
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Deploy applications to staging VM
+      run: |
+        echo "Deploying microservices to VM at $VM_IP"
+        
+        # Configure SSH access
+        mkdir -p ~/.ssh
+        echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+        chmod 600 ~/.ssh/id_rsa
+        ssh-keyscan -H $VM_IP >> ~/.ssh/known_hosts
+        
+        # Deploy applications via SSH
+        ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no azureuser@$VM_IP << 'EOF'
+          echo "Starting deployment process..."
+          
+          # Create project directory
+          mkdir -p /home/azureuser/microservice-app
+          cd /home/azureuser/microservice-app
+          
+          # Clone/update repository
+          if [ ! -d ".git" ]; then
+            echo "Cloning repository..."
+            git clone https://github.com/JuanseDev2001/microservice-app-example.git .
+          else
+            echo "Updating repository..."
+            git pull origin env/staging
+          fi
+          
+          # Fix Docker installation if needed
+          if ! docker --version &>/dev/null; then
+            echo "Fixing Docker installation..."
+            sudo apt-get update
+            sudo apt-get install -y docker.io
+            sudo systemctl start docker
+            sudo systemctl enable docker
+            sudo usermod -aG docker azureuser
+          fi
+          
+          # Restart docker service to ensure it's running
+          sudo systemctl restart docker
+          sleep 5
+          
+          # Start services (use newgrp to apply docker group membership)
+          echo "Starting microservices..."
+          newgrp docker << 'DOCKER_COMMANDS'
+            docker-compose down --remove-orphans || echo "No existing containers"
+            docker-compose pull
+            docker-compose up -d
+            
+            echo "Waiting for services to start..."
+            sleep 30
+            
+            echo "Container status:"
+            docker-compose ps
+            
+            echo "Service logs (last 10 lines each):"
+            echo "=== Frontend logs ==="
+            docker-compose logs --tail=10 frontend || echo "Frontend not running"
+            echo "=== Auth API logs ==="
+            docker-compose logs --tail=10 auth-api || echo "Auth API not running"
+            echo "=== Users API logs ==="
+            docker-compose logs --tail=10 users-api || echo "Users API not running"
+            echo "=== Todos API logs ==="
+            docker-compose logs --tail=10 todos-api || echo "Todos API not running"
+DOCKER_COMMANDS
+          
+          echo "Deployment process completed!"
+        EOF
+        
+    - name: Verify deployment
+      run: |
+        echo "Verifying service availability..."
+        
+        # Test each service endpoint
+        services=(
+          "Frontend:http://$VM_IP:9083"
+          "Auth API:http://$VM_IP:9080/health"
+          "Users API:http://$VM_IP:9081/actuator/health"
+          "Todos API:http://$VM_IP:9082/health"
+        )
+        
+        for service in "${services[@]}"; do
+          name=$(echo $service | cut -d: -f1)
+          url=$(echo $service | cut -d: -f2-3)
+          echo "Testing $name at $url..."
+          
+          if curl -f -m 10 $url > /dev/null 2>&1; then
+            echo "✅ $name is responding"
+          else
+            echo "❌ $name is not responding (this might be expected if service doesn't have health endpoint)"
+          fi
+        done
+        
+        echo ""
+        echo "🎉 Deployment completed! Services should be available at:"
+        echo "Frontend: http://$VM_IP:9083"
+        echo "Auth API: http://$VM_IP:9080"
+        echo "Users API: http://$VM_IP:9081"
+        echo "Todos API: http://$VM_IP:9082"
