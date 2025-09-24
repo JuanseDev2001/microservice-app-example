@@ -13,6 +13,10 @@ crash.log
 *.tfvars
 *.tfvars.json
 
+# Allow our specific environment tfvars files (they don't contain secrets)
+!infra/terraform/staging.tfvars
+!infra/terraform/production.tfvars
+
 # Ignore override files as they are usually used to override resources locally and so
 # are not checked in
 override.tf
