@@ -1,21 +1,15 @@
 #cloud-config
 package_update: true
-package_upgrade: true
+package_upgrade: false
 
 packages:
-  - apt-transport-https
-  - ca-certificates
   - curl
-  - gnupg
-  - lsb-release
   - git
 
 runcmd:
-  # Install Docker
-  - curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
-  - echo "deb [arch=amd64 signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null
-  - apt-get update
-  - apt-get install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
+  # Quick Docker installation using convenience script (faster)
+  - curl -fsSL https://get.docker.com -o get-docker.sh
+  - sh get-docker.sh
   - systemctl start docker
   - systemctl enable docker
   - usermod -aG docker azureuser
@@ -28,18 +22,9 @@ runcmd:
   - mkdir -p /home/azureuser/microservice-app
   - chown azureuser:azureuser /home/azureuser/microservice-app
   
-  # Create docker-compose file
-  - echo "${docker_compose_content}" | base64 -d > /home/azureuser/microservice-app/docker-compose.yml
-  - chown azureuser:azureuser /home/azureuser/microservice-app/docker-compose.yml
-  
-  # Clone the repository (you might want to use your specific branch)
-  - cd /home/azureuser/microservice-app
-  - git clone https://github.com/JuanseDev2001/microservice-app-example.git .
-  - chown -R azureuser:azureuser /home/azureuser/microservice-app
-  
-  # Start the services
-  - cd /home/azureuser/microservice-app
-  - sudo -u azureuser docker-compose up -d
+  # Create a simple status file to indicate cloud-init completion
+  - echo "Cloud-init completed at $(date)" > /home/azureuser/cloud-init-complete.txt
+  - chown azureuser:azureuser /home/azureuser/cloud-init-complete.txt
 
 write_files:
   - path: /home/azureuser/start-services.sh

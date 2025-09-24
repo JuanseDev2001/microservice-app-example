@@ -177,21 +177,39 @@ jobs:
         echo "Waiting for VM to be fully ready for SSH connections..."
         echo "VM IP: ${{ env.VM_IP }}"
         
-        # Extended retry loop - up to 10 minutes
-        for i in {1..60}; do
-          echo "SSH connection attempt $i/60..."
-          if ssh -i ~/.ssh/id_rsa -o ConnectTimeout=10 -o StrictHostKeyChecking=no azureuser@${{ env.VM_IP }} "echo 'SSH test successful' && exit 0" 2>/dev/null; then
-            echo "SSH connection established successfully"
-            break
-          else
-            if [ $i -eq 60 ]; then
-              echo "ERROR: VM failed to become SSH-ready after 10 minutes"
-              echo "This may indicate a VM configuration or networking issue"
-              exit 1
+        # Extended retry loop - up to 15 minutes (cloud-init can take time)
+        for i in {1..90}; do
+          echo "SSH connection attempt $i/90..."
+          
+          # First check if the VM is reachable at all
+          if timeout 5 bash -c "</dev/tcp/${{ env.VM_IP }}/22"; then
+            echo "Port 22 is open, attempting SSH..."
+            if ssh -i ~/.ssh/id_rsa -o ConnectTimeout=15 -o StrictHostKeyChecking=no azureuser@${{ env.VM_IP }} "echo 'SSH test successful' && exit 0" 2>/dev/null; then
+              echo "SSH connection established successfully"
+              break
+            else
+              echo "Port 22 open but SSH not ready (likely cloud-init still running)"
             fi
-            echo "VM not ready yet, waiting 10 seconds... ($(($i * 10))s elapsed)"
-            sleep 10
+          else
+            echo "Port 22 not yet accessible"
           fi
+          
+          if [ $i -eq 90 ]; then
+            echo "ERROR: VM failed to become SSH-ready after 15 minutes"
+            echo "Let's gather some debugging information..."
+            
+            # Try to get VM status from Azure
+            echo "Checking VM power state..."
+            az vm get-instance-view --resource-group microapp-staging-rg --name microapp-staging-vm --query "instanceView.statuses[1].displayStatus" -o tsv || echo "Failed to get VM status"
+            
+            # Check if port 22 is reachable
+            echo "Testing port 22 connectivity..."
+            timeout 10 bash -c "</dev/tcp/${{ env.VM_IP }}/22" && echo "Port 22 is reachable" || echo "Port 22 is not reachable"
+            
+            exit 1
+          fi
+          echo "Waiting 10 seconds... ($((i * 10))s elapsed out of 900s total)"
+          sleep 10
         done
         
         # Execute infrastructure verification on remote VM
