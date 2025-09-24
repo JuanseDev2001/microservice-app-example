@@ -311,10 +311,8 @@ jobs:
             repo: context.repo.repo,
             workflow_id: 'deploy-staging.yml',
             ref: 'env/staging',
-            inputs: {
-              vm_ip: '${{ env.VM_IP }}'
-            }
+            inputs: {}
           });
           
-          console.log(`Successfully triggered deployment pipeline with VM IP: ${{ env.VM_IP }}`);
-          console.log('Deployment pipeline will start automatically in a few seconds...');
+          console.log('Successfully triggered deployment pipeline with auto-detection');
+          console.log('Deployment pipeline will auto-detect the VM IP and start automatically...');
