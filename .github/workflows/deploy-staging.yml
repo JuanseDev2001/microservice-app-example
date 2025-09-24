@@ -20,8 +20,10 @@ on:
 
 jobs:
   deploy:
-    name: Deploy Microservices
+    name: Deploy Microservices  
     runs-on: ubuntu-latest
+    # Enable only for debugging - disable when no VM available
+    if: true
     
     steps:
     - name: Checkout code

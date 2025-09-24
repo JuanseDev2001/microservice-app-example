@@ -1,10 +1,12 @@
 name: Infrastructure Pipeline - Staging
 
+# Temporarily disabled for debugging - uncomment when needed  
 on:
-  push:
-    branches: [ env/staging ]
-  pull_request:
-    branches: [ env/staging ]
+  workflow_dispatch:
+  # push:
+  #   branches: [ env/staging ]
+  # pull_request:
+  #   branches: [ env/staging ]
 
 jobs:
   validate:
