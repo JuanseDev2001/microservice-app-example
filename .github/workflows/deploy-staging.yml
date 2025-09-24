@@ -63,11 +63,51 @@ jobs:
       run: |
         echo "Deploying microservices to VM at ${{ env.VM_IP }}"
         
+        # Verify VM_IP is set
+        if [ -z "${{ env.VM_IP }}" ]; then
+          echo "ERROR: VM_IP is not set"
+          exit 1
+        fi
+        
+        # Test VM connectivity first
+        echo "Testing VM connectivity..."
+        if ! ping -c 3 ${{ env.VM_IP }}; then
+          echo "ERROR: VM is not reachable via ping"
+          exit 1
+        fi
+        
+        # Test SSH port
+        echo "Testing SSH port 22..."
+        if ! timeout 10 bash -c "</dev/tcp/${{ env.VM_IP }}/22"; then
+          echo "ERROR: SSH port 22 is not accessible"
+          exit 1
+        fi
+        
         # Configure SSH access
         mkdir -p ~/.ssh
+        
+        # Check if SSH private key secret exists
+        if [ -z "${{ secrets.SSH_PRIVATE_KEY }}" ]; then
+          echo "ERROR: SSH_PRIVATE_KEY secret is not configured"
+          exit 1
+        fi
+        
         echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
         chmod 600 ~/.ssh/id_rsa
+        
+        # Add host to known_hosts
         ssh-keyscan -H ${{ env.VM_IP }} >> ~/.ssh/known_hosts
+        
+        # Test SSH connection first
+        echo "Testing SSH connection..."
+        if ! ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no -o ConnectTimeout=10 azureuser@${{ env.VM_IP }} "echo 'SSH connection successful'"; then
+          echo "ERROR: SSH connection failed. Possible issues:"
+          echo "1. SSH_PRIVATE_KEY secret is incorrect"
+          echo "2. User 'azureuser' doesn't exist on VM"
+          echo "3. SSH key doesn't match"
+          echo "4. VM is not properly configured"
+          exit 1
+        fi
         
         # Deploy applications via SSH
         ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no azureuser@${{ env.VM_IP }} << 'EOF'
