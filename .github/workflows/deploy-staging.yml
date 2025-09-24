@@ -1,5 +1,6 @@
 name: Deploy Applications to Staging
 
+# Auto-deploy microservices to staging VM with dynamic IP detection
 on:
   workflow_dispatch:
     inputs:
