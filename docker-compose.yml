@@ -1,4 +1,5 @@
 version: '3.8'
+# Microservice application stack
 services:
   redis:
     image: redis:latest
