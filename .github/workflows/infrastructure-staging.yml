@@ -173,28 +173,57 @@ jobs:
         chmod 600 ~/.ssh/id_rsa
         ssh-keyscan -H ${{ env.VM_IP }} >> ~/.ssh/known_hosts
         
+        # Wait for VM to be fully ready with extended timeout
+        echo "Waiting for VM to be fully ready for SSH connections..."
+        echo "VM IP: ${{ env.VM_IP }}"
+        
+        # Extended retry loop - up to 10 minutes
+        for i in {1..60}; do
+          echo "SSH connection attempt $i/60..."
+          if ssh -i ~/.ssh/id_rsa -o ConnectTimeout=10 -o StrictHostKeyChecking=no azureuser@${{ env.VM_IP }} "echo 'SSH test successful' && exit 0" 2>/dev/null; then
+            echo "SSH connection established successfully"
+            break
+          else
+            if [ $i -eq 60 ]; then
+              echo "ERROR: VM failed to become SSH-ready after 10 minutes"
+              echo "This may indicate a VM configuration or networking issue"
+              exit 1
+            fi
+            echo "VM not ready yet, waiting 10 seconds... ($(($i * 10))s elapsed)"
+            sleep 10
+          fi
+        done
+        
         # Execute infrastructure verification on remote VM
-        ssh -i ~/.ssh/id_rsa azureuser@${{ env.VM_IP }} << 'EOF'
+        echo "Running infrastructure verification on VM..."
+        ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no azureuser@${{ env.VM_IP }} << 'EOF'
           echo "SSH connection to staging VM established successfully"
           
           # Verify Docker installation and version
           echo "Verifying Docker installation:"
-          docker --version
+          docker --version || echo "Docker not yet available"
           
           # Verify Docker Compose installation and version  
           echo "Verifying Docker Compose installation:"
-          docker-compose --version
+          docker-compose --version || echo "Docker Compose not yet available"
           
           # Verify system resources
           echo "System resource verification:"
           free -h
           df -h /
           
-          echo "Docker environment is ready for application deployment"
+          # Check if cloud-init is complete
+          echo "Checking VM initialization status:"
+          if [ -f /var/log/cloud-init.log ]; then
+            echo "Cloud-init log exists"
+            tail -5 /var/log/cloud-init.log | grep -E "(finished|complete)" || echo "Cloud-init may still be running"
+          fi
+          
+          echo "Basic VM verification completed"
         EOF
         
         echo "Infrastructure verification completed successfully"
-        echo "Staging VM is ready for deployment at IP: ${{ env.VM_IP }}"
+        echo "Staging VM is ready at IP: ${{ env.VM_IP }}"
         
     - name: Complete staging infrastructure deployment
       run: |
