@@ -9,14 +9,16 @@ on:
         required: false
         default: ''
   push:
+    branches:
+      - env/staging
     paths:
       - 'frontend/**'
       - 'auth-api/**'
       - 'users-api/**'
       - 'todos-api/**'
+      - 'log-message-processor/**'
       - 'docker-compose.yml'
-    branches:
-      - env/staging
+      - '.github/workflows/deploy-staging.yml'
 
 jobs:
   deploy:
