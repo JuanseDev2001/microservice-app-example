@@ -20,10 +20,8 @@ on:
 
 jobs:
   deploy:
-    name: Deploy Microservices  
+    name: Deploy Microservices
     runs-on: ubuntu-latest
-    # Enable only for debugging - disable when no VM available
-    if: true
     
     steps:
     - name: Checkout code
@@ -75,6 +73,12 @@ jobs:
         echo "Testing VM connectivity..."
         if ! ping -c 3 ${{ env.VM_IP }}; then
           echo "ERROR: VM is not reachable via ping"
+          echo "VM IP: ${{ env.VM_IP }}"
+          echo "This could mean:"
+          echo "1. VM is powered off"
+          echo "2. VM doesn't exist"
+          echo "3. Network Security Group blocks ICMP"
+          echo "4. Wrong subscription/resource group"
           exit 1
         fi
         
@@ -82,6 +86,10 @@ jobs:
         echo "Testing SSH port 22..."
         if ! timeout 10 bash -c "</dev/tcp/${{ env.VM_IP }}/22"; then
           echo "ERROR: SSH port 22 is not accessible"
+          echo "This could mean:"
+          echo "1. VM is not running SSH service"
+          echo "2. Network Security Group blocks port 22"
+          echo "3. VM firewall blocks SSH"
           exit 1
         fi
         
@@ -90,7 +98,8 @@ jobs:
         
         # Check if SSH private key secret exists
         if [ -z "${{ secrets.SSH_PRIVATE_KEY }}" ]; then
-          echo "ERROR: SSH_PRIVATE_KEY secret is not configured"
+          echo "ERROR: SSH_PRIVATE_KEY secret is not configured in GitHub"
+          echo "Please add this secret in: Settings > Secrets and variables > Actions"
           exit 1
         fi
         
@@ -106,10 +115,12 @@ jobs:
           echo "ERROR: SSH connection failed. Possible issues:"
           echo "1. SSH_PRIVATE_KEY secret is incorrect"
           echo "2. User 'azureuser' doesn't exist on VM"
-          echo "3. SSH key doesn't match"
-          echo "4. VM is not properly configured"
+          echo "3. SSH key doesn't match the VM's authorized_keys"
+          echo "4. VM SSH configuration issues"
           exit 1
         fi
+        
+        echo "✅ All connectivity tests passed! Proceeding with deployment..."
         
         # Deploy applications via SSH
         ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no azureuser@${{ env.VM_IP }} << 'EOF'
