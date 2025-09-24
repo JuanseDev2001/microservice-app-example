@@ -15,6 +15,13 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v4
       
+    - name: Install Docker Compose
+      run: |
+        echo "Installing Docker Compose"
+        sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+        sudo chmod +x /usr/local/bin/docker-compose
+        docker-compose --version
+      
     - name: Validate production Docker Compose configuration
       run: |
         echo "Validating production infrastructure configuration files"
@@ -27,7 +34,14 @@ jobs:
           echo "No production-specific docker-compose file found, using default configuration"
         fi
         
-        # Validate primary Docker Compose configuration
+        # Validate primary Docker Compose configuration (located in root)
+        echo "Validating main Docker Compose configuration"
+        if [ -f "docker-compose.yml" ]; then
+          docker-compose config
+        else
+          echo "No docker-compose.yml found in root directory"
+          ls -la
+        fi
         echo "Validating main Docker Compose configuration"
         docker-compose config
         
