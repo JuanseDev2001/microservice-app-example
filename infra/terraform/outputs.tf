@@ -3,6 +3,11 @@ output "public_ip_address" {
   value       = azurerm_public_ip.public_ip.ip_address
 }
 
+output "vm_public_ip" {
+  description = "VM public IP address (for pipeline compatibility)"
+  value       = azurerm_public_ip.public_ip.ip_address
+}
+
 output "frontend_url" {
   description = "URL para acceder al frontend"
   value       = "http://${azurerm_public_ip.public_ip.ip_address}:9083"
