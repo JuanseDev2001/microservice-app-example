@@ -1,12 +1,12 @@
 name: Infrastructure Pipeline - Staging
 
-# Temporarily disabled for debugging - uncomment when needed  
+# Infrastructure pipeline - now preserves existing resources  
 on:
   workflow_dispatch:
-  # push:
-  #   branches: [ env/staging ]
-  # pull_request:
-  #   branches: [ env/staging ]
+  push:
+    branches: [ env/staging ]
+  pull_request:
+    branches: [ env/staging ]
 
 jobs:
   validate:
