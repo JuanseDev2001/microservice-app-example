@@ -57,6 +57,6 @@ services:
     ports:
       - "9083:80"
     environment:
-      - VUE_APP_API_URL=http://todos-api:8082
+      - VUE_APP_API_URL=http://localhost:9082
     depends_on:
       - todos-api

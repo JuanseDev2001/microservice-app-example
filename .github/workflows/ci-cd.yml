@@ -2,9 +2,9 @@ name: CI/CD Pipeline
 
 on:
   push:
-    branches: [ main, develop ]
+    branches: [ main, develop, env/staging ]
   pull_request:
-    branches: [ main, develop ]
+    branches: [ main, develop, env/staging ]
 
 jobs:
   test:
@@ -89,6 +89,23 @@ jobs:
         cd auth-api
         go mod tidy
         go build -v ./...
+        
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+        
+    - name: Build Log Message Processor
+      run: |
+        cd log-message-processor
+        pip install -r requirements.txt
+        python -m py_compile main.py
+        
+    - name: Build Todos API
+      run: |
+        cd todos-api
+        npm ci
+        npm test
 
   docker:
     name: Build Docker Images
@@ -127,6 +144,7 @@ jobs:
         docker-compose build users-api  
         docker-compose build todos-api
         docker-compose build frontend
+        docker-compose build log-message-processor
         
         echo "All Docker images built and validated successfully"
 
