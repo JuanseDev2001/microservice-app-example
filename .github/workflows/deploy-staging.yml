@@ -141,33 +141,41 @@ jobs:
             sudo usermod -aG docker azureuser
           fi
           
+          # Install Docker Compose if not present
+          if ! docker-compose --version &>/dev/null; then
+            echo "Installing Docker Compose..."
+            sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+            sudo chmod +x /usr/local/bin/docker-compose
+          fi
+          
           # Restart docker service to ensure it's running
           sudo systemctl restart docker
           sleep 5
           
-          # Start services (use newgrp to apply docker group membership)
+          # Start services with proper Docker permissions
           echo "Starting microservices..."
-          newgrp docker << 'DOCKER_COMMANDS'
-            docker-compose down --remove-orphans || echo "No existing containers"
-            docker-compose pull
-            docker-compose up -d
-            
-            echo "Waiting for services to start..."
-            sleep 30
-            
-            echo "Container status:"
-            docker-compose ps
-            
-            echo "Service logs (last 10 lines each):"
-            echo "=== Frontend logs ==="
-            docker-compose logs --tail=10 frontend || echo "Frontend not running"
-            echo "=== Auth API logs ==="
-            docker-compose logs --tail=10 auth-api || echo "Auth API not running"
-            echo "=== Users API logs ==="
-            docker-compose logs --tail=10 users-api || echo "Users API not running"
-            echo "=== Todos API logs ==="
-            docker-compose logs --tail=10 todos-api || echo "Todos API not running"
-          DOCKER_COMMANDS
+          sudo usermod -aG docker azureuser
+          
+          # Use sudo to run docker-compose commands
+          sudo docker-compose down --remove-orphans || echo "No existing containers"
+          sudo docker-compose pull
+          sudo docker-compose up -d
+          
+          echo "Waiting for services to start..."
+          sleep 30
+          
+          echo "Container status:"
+          sudo docker-compose ps
+          
+          echo "Service logs (last 10 lines each):"
+          echo "=== Frontend logs ==="
+          sudo docker-compose logs --tail=10 frontend || echo "Frontend not running"
+          echo "=== Auth API logs ==="
+          sudo docker-compose logs --tail=10 auth-api || echo "Auth API not running"
+          echo "=== Users API logs ==="
+          sudo docker-compose logs --tail=10 users-api || echo "Users API not running"
+          echo "=== Todos API logs ==="
+          sudo docker-compose logs --tail=10 todos-api || echo "Todos API not running"
           
           echo "Deployment process completed!"
         EOF
