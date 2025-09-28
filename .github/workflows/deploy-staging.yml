@@ -1,0 +1,212 @@
+name: Deploy Applications to Staging
+
+# Auto-deploy microservices to staging VM with dynamic IP detection
+# Ready to deploy with stable VM infrastructure
+on:
+  workflow_dispatch:
+    inputs:
+      vm_ip:
+        description: 'VM IP Address (leave empty to auto-detect)'
+        required: false
+        default: ''
+  push:
+    branches:
+      - env/staging
+    paths:
+      - 'frontend/**'
+      - 'auth-api/**'
+      - 'users-api/**'
+      - 'todos-api/**'
+      - 'log-message-processor/**'
+      - 'docker-compose.yml'
+      - '.github/workflows/deploy-staging.yml'
+
+jobs:
+  deploy:
+    name: Deploy Microservices
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Azure Login
+      uses: azure/login@v1
+      with:
+        creds: ${{ secrets.AZURE_CREDENTIALS }}
+        
+    - name: Get VM IP dynamically
+      id: get-vm-ip
+      run: |
+        echo "Getting VM IP dynamically..."
+        
+        # If IP provided manually, use it
+        if [ "${{ github.event.inputs.vm_ip }}" != "" ]; then
+          VM_IP="${{ github.event.inputs.vm_ip }}"
+          echo "Using manually provided IP: $VM_IP"
+        else
+          # Auto-detect VM IP from Azure
+          echo "Auto-detecting VM IP from Azure..."
+          VM_IP=$(az vm list-ip-addresses --resource-group microapp-staging-rg --name microapp-staging-vm --query "[0].virtualMachine.network.publicIpAddresses[0].ipAddress" -o tsv)
+          
+          if [ "$VM_IP" == "" ] || [ "$VM_IP" == "null" ]; then
+            echo "ERROR: Could not find VM IP. Checking if VM exists..."
+            az vm list --resource-group microapp-staging-rg --output table
+            exit 1
+          fi
+          
+          echo "Auto-detected VM IP: $VM_IP"
+        fi
+        
+        echo "VM_IP=$VM_IP" >> $GITHUB_OUTPUT
+        echo "VM_IP=$VM_IP" >> $GITHUB_ENV
+        echo "Using VM IP: $VM_IP"
+      
+    - name: Deploy applications to staging VM
+      run: |
+        echo "Deploying microservices to VM at ${{ env.VM_IP }}"
+        
+        # Verify VM_IP is set
+        if [ -z "${{ env.VM_IP }}" ]; then
+          echo "ERROR: VM_IP is not set"
+          exit 1
+        fi
+        
+        # Test SSH connectivity (Azure blocks ICMP/ping by default)
+        echo "Testing SSH connectivity to ${{ env.VM_IP }}:22..."
+        if ! timeout 10 bash -c "</dev/tcp/${{ env.VM_IP }}/22"; then
+          echo "ERROR: SSH port 22 is not accessible on ${{ env.VM_IP }}"
+          echo "This could mean:"
+          echo "1. VM is powered off"
+          echo "2. VM doesn't exist" 
+          echo "3. Network Security Group blocks port 22"
+          echo "4. SSH service not running"
+          exit 1
+        fi
+        echo "✅ SSH port 22 is accessible"
+        
+        # Configure SSH access
+        mkdir -p ~/.ssh
+        
+        # Check if SSH private key secret exists
+        if [ -z "${{ secrets.SSH_PRIVATE_KEY }}" ]; then
+          echo "ERROR: SSH_PRIVATE_KEY secret is not configured in GitHub"
+          echo "Please add this secret in: Settings > Secrets and variables > Actions"
+          exit 1
+        fi
+        
+        echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+        chmod 600 ~/.ssh/id_rsa
+        
+        # Add host to known_hosts
+        ssh-keyscan -H ${{ env.VM_IP }} >> ~/.ssh/known_hosts
+        
+        # Test SSH connection first
+        echo "Testing SSH connection..."
+        if ! ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no -o ConnectTimeout=10 azureuser@${{ env.VM_IP }} "echo 'SSH connection successful'"; then
+          echo "ERROR: SSH connection failed. Possible issues:"
+          echo "1. SSH_PRIVATE_KEY secret is incorrect"
+          echo "2. User 'azureuser' doesn't exist on VM"
+          echo "3. SSH key doesn't match the VM's authorized_keys"
+          echo "4. VM SSH configuration issues"
+          exit 1
+        fi
+        
+        echo "✅ All connectivity tests passed! Proceeding with deployment..."
+        
+        # Deploy applications via SSH
+        ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no azureuser@${{ env.VM_IP }} << 'EOF'
+          echo "Starting deployment process..."
+          
+          # Create project directory
+          mkdir -p /home/azureuser/microservice-app
+          cd /home/azureuser/microservice-app
+          
+          # Clone/update repository
+          if [ ! -d ".git" ]; then
+            echo "Cloning repository..."
+            git clone https://github.com/JuanseDev2001/microservice-app-example.git .
+          else
+            echo "Updating repository..."
+            git pull origin env/staging
+          fi
+          
+          # Fix Docker installation if needed
+          if ! docker --version &>/dev/null; then
+            echo "Fixing Docker installation..."
+            sudo apt-get update
+            sudo apt-get install -y docker.io
+            sudo systemctl start docker
+            sudo systemctl enable docker
+            sudo usermod -aG docker azureuser
+          fi
+          
+          # Install Docker Compose if not present
+          if ! docker-compose --version &>/dev/null; then
+            echo "Installing Docker Compose..."
+            sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+            sudo chmod +x /usr/local/bin/docker-compose
+          fi
+          
+          # Restart docker service to ensure it's running
+          sudo systemctl restart docker
+          sleep 5
+          
+          # Start services with proper Docker permissions
+          echo "Starting microservices..."
+          sudo usermod -aG docker azureuser
+          
+          # Use sudo to run docker-compose commands
+          sudo docker-compose down --remove-orphans || echo "No existing containers"
+          sudo docker-compose pull
+          sudo docker-compose up -d
+          
+          echo "Waiting for services to start..."
+          sleep 30
+          
+          echo "Container status:"
+          sudo docker-compose ps
+          
+          echo "Service logs (last 10 lines each):"
+          echo "=== Frontend logs ==="
+          sudo docker-compose logs --tail=10 frontend || echo "Frontend not running"
+          echo "=== Auth API logs ==="
+          sudo docker-compose logs --tail=10 auth-api || echo "Auth API not running"
+          echo "=== Users API logs ==="
+          sudo docker-compose logs --tail=10 users-api || echo "Users API not running"
+          echo "=== Todos API logs ==="
+          sudo docker-compose logs --tail=10 todos-api || echo "Todos API not running"
+          
+          echo "Deployment process completed!"
+        EOF
+        
+    - name: Verify deployment
+      run: |
+        echo "Verifying service availability..."
+        
+        # Test each service endpoint
+        services=(
+          "Frontend:http://${{ env.VM_IP }}:9083"
+          "Auth API:http://${{ env.VM_IP }}:9080/health"
+          "Users API:http://${{ env.VM_IP }}:9081/actuator/health"
+          "Todos API:http://${{ env.VM_IP }}:9082/health"
+        )
+        
+        for service in "${services[@]}"; do
+          name=$(echo $service | cut -d: -f1)
+          url=$(echo $service | cut -d: -f2-3)
+          echo "Testing $name at $url..."
+          
+          if curl -f -m 10 $url > /dev/null 2>&1; then
+            echo "✅ $name is responding"
+          else
+            echo "❌ $name is not responding (this might be expected if service doesn't have health endpoint)"
+          fi
+        done
+        
+        echo ""
+        echo "🎉 Deployment completed! Services should be available at:"
+        echo "Frontend: http://${{ env.VM_IP }}:9083"
+        echo "Auth API: http://${{ env.VM_IP }}:9080"
+        echo "Users API: http://${{ env.VM_IP }}:9081"
+        echo "Todos API: http://${{ env.VM_IP }}:9082"

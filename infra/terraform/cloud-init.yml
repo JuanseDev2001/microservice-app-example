@@ -1,0 +1,11 @@
+#cloud-config
+package_update: false
+package_upgrade: false
+
+packages:
+  - curl
+
+runcmd:
+  # Minimal setup - just ensure SSH is ready and create completion indicator
+  - echo "Cloud-init minimal setup completed at $(date)" > /home/azureuser/cloud-init-ready.txt
+  - chown azureuser:azureuser /home/azureuser/cloud-init-ready.txt
