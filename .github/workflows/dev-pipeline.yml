@@ -38,26 +38,26 @@ jobs:
         
     - name: Install dependencies and run linters
       run: |
-        echo "🔍 Running code quality checks for development..."
+        echo "Running code quality checks for development..."
         
         # Java - Maven checkstyle
         cd users-api
-        ./mvnw checkstyle:check || echo "⚠️ Java checkstyle warnings found"
+        ./mvnw checkstyle:check || echo "Java checkstyle warnings found"
         cd ..
         
         # Node.js - ESLint
         cd todos-api
         npm install
-        npm run lint || echo "⚠️ Node.js lint warnings found"
+        npm run lint || echo "Node.js lint warnings found"
         cd ..
         
         # Frontend - ESLint
         cd frontend
         npm install
-        npm run lint || echo "⚠️ Frontend lint warnings found"
+        npm run lint || echo "Frontend lint warnings found"
         cd ..
         
-        echo "✅ Code quality checks completed"
+        echo "Code quality checks completed"
 
   quick-tests:
     name: Quick Development Tests
@@ -91,7 +91,7 @@ jobs:
         
     - name: Run quick tests
       run: |
-        echo "🧪 Running quick tests for development branch..."
+        echo " Running quick tests for development branch..."
         
         # Java - Unit tests only (skip integration)
         echo "Testing Users API (Java)..."
@@ -103,23 +103,23 @@ jobs:
         echo "Testing Todos API (Node.js)..."
         cd todos-api
         npm install
-        npm test || echo "⚠️ Some Node.js tests failed"
+        npm test || echo "Some Node.js tests failed"
         cd ..
         
         # Go - Quick tests
         echo "Testing Auth API (Go)..."
         cd auth-api
-        go test -v -short ./... || echo "⚠️ Some Go tests failed"
+        go test -v -short ./... || echo "Some Go tests failed"
         cd ..
         
         # Python - Quick tests
         echo "Testing Log Processor (Python)..."
         cd log-message-processor
         pip install -r requirements.txt
-        python -m pytest -v --tb=short || echo "⚠️ Some Python tests failed"
+        python -m pytest -v --tb=short || echo "Some Python tests failed"
         cd ..
         
-        echo "✅ Quick tests completed"
+        echo "Quick tests completed"
 
   dev-build:
     name: Development Build
@@ -136,7 +136,7 @@ jobs:
       
     - name: Build development images
       run: |
-        echo "🐳 Building development Docker images..."
+        echo "Building development Docker images..."
         
         # Build only changed services for faster dev cycle
         docker build -t dev/users-api:latest ./users-api
@@ -145,13 +145,13 @@ jobs:
         docker build -t dev/log-processor:latest ./log-message-processor
         docker build -t dev/frontend:latest ./frontend
         
-        echo "✅ Development images built successfully"
+        echo "Development images built successfully"
         
     - name: Test docker-compose configuration
       run: |
-        echo "🔧 Testing docker-compose configuration..."
+        echo "Testing docker-compose configuration..."
         docker-compose config
-        echo "✅ Docker-compose configuration is valid"
+        echo "Docker-compose configuration is valid"
 
   dev-integration:
     name: Development Integration Test
@@ -165,32 +165,32 @@ jobs:
       
     - name: Start services for integration testing
       run: |
-        echo "🚀 Starting services for integration testing..."
+        echo "Starting services for integration testing..."
         docker-compose up -d
         
         # Wait for services to be ready
         sleep 45
         
-        echo "🔍 Checking service health..."
+        echo "Checking service health..."
         docker-compose ps
         
     - name: Run integration tests
       run: |
-        echo "🧪 Running integration tests..."
+        echo " Running integration tests..."
         
         # Test frontend
-        curl -f http://localhost:9083 || (echo "❌ Frontend not responding" && exit 1)
+        curl -f http://localhost:9083 || (echo "Frontend not responding" && exit 1)
         
         # Test users API with cache
-        curl -f http://localhost:9081/users/cache/stats || (echo "❌ Users API cache not working" && exit 1)
+        curl -f http://localhost:9081/users/cache/stats || (echo "Users API cache not working" && exit 1)
         
         # Test todos API
-        curl -f http://localhost:9080/api/todos || (echo "❌ Todos API not responding" && exit 1)
+        curl -f http://localhost:9080/api/todos || (echo "Todos API not responding" && exit 1)
         
         # Test auth API
-        curl -f http://localhost:9082/login || (echo "❌ Auth API not responding" && exit 1)
+        curl -f http://localhost:9082/login || (echo "Auth API not responding" && exit 1)
         
-        echo "✅ All integration tests passed!"
+        echo "All integration tests passed!"
         
     - name: Cleanup
       if: always()
@@ -208,20 +208,20 @@ jobs:
     steps:
     - name: Development summary
       run: |
-        echo "📊 Development Pipeline Summary for branch: dev"
+        echo "Development Pipeline Summary for branch: dev"
         echo "=================================="
-        echo "✅ Code Quality: ${{ needs.lint-and-format.result }}"
-        echo "✅ Quick Tests: ${{ needs.quick-tests.result }}"
-        echo "✅ Dev Build: ${{ needs.dev-build.result }}"
-        echo "✅ Integration: ${{ needs.dev-integration.result }}"
+        echo "Code Quality: ${{ needs.lint-and-format.result }}"
+        echo "Quick Tests: ${{ needs.quick-tests.result }}"
+        echo "Dev Build: ${{ needs.dev-build.result }}"
+        echo "Integration: ${{ needs.dev-integration.result }}"
         echo "=================================="
         
         if [[ "${{ needs.lint-and-format.result }}" == "success" && \
               "${{ needs.quick-tests.result }}" == "success" && \
               "${{ needs.dev-build.result }}" == "success" && \
               "${{ needs.dev-integration.result }}" == "success" ]]; then
-          echo "🎉 Development pipeline completed successfully!"
-          echo "💡 Ready for feature branch creation or main merge"
+          echo " Development pipeline completed successfully!"
+          echo "Ready for feature branch creation or main merge"
         else
-          echo "⚠️ Some development checks failed - review needed"
+          echo "Some development checks failed - review needed"
         fi
