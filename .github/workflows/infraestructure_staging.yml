@@ -108,37 +108,68 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v4
       
-    - name: Setup Terraform
-      uses: hashicorp/setup-terraform@v3
-      with:
-        terraform_version: '1.5.0'
-        
     - name: Azure Login
       uses: azure/login@v1
       with:
         creds: ${{ secrets.AZURE_CREDENTIALS }}
         
+    - name: Check if VM exists
+      run: |
+        echo "Checking if staging VM already exists..."
+        
+        # Check if VM exists and is running
+        VM_EXISTS=$(az vm show --resource-group microapp-staging-rg --name microapp-staging-vm --query "provisioningState" -o tsv 2>/dev/null || echo "NotFound")
+        
+        if [ "$VM_EXISTS" != "NotFound" ]; then
+          echo "VM exists with status: $VM_EXISTS"
+          
+          # Get VM status (running/stopped/etc)
+          VM_STATUS=$(az vm get-instance-view --resource-group microapp-staging-rg --name microapp-staging-vm --query "instanceView.statuses[1].code" -o tsv)
+          echo "VM power state: $VM_STATUS"
+          
+          # Get VM IP address
+          VM_IP=$(az vm show --resource-group microapp-staging-rg --name microapp-staging-vm --show-details --query "publicIps" -o tsv)
+          echo "VM IP: $VM_IP"
+          
+          # Start VM if it's not running
+          if [[ "$VM_STATUS" == *"deallocated"* ]] || [[ "$VM_STATUS" == *"stopped"* ]]; then
+            echo "VM is stopped/deallocated. Starting VM..."
+            az vm start --resource-group microapp-staging-rg --name microapp-staging-vm
+            echo "VM started successfully"
+            
+            # Wait for VM to be fully ready
+            echo "Waiting for VM to be ready..."
+            sleep 30
+            
+            # Get updated IP (might change after restart)
+            VM_IP=$(az vm show --resource-group microapp-staging-rg --name microapp-staging-vm --show-details --query "publicIps" -o tsv)
+            echo "VM IP after start: $VM_IP"
+          else
+            echo "VM is already running"
+          fi
+          
+          echo "VM_EXISTS=true" >> $GITHUB_ENV
+          echo "VM_IP=$VM_IP" >> $GITHUB_ENV
+        else
+          echo "VM does not exist"
+          echo "VM_EXISTS=false" >> $GITHUB_ENV
+        fi
+        
+    - name: Setup Terraform
+      if: env.VM_EXISTS == 'false'
+      uses: hashicorp/setup-terraform@v3
+      with:
+        terraform_version: '1.5.0'
+        
     - name: Deploy Terraform infrastructure to staging
+      if: env.VM_EXISTS == 'false'
       working-directory: ./infra/terraform
       run: |
-        echo "Deploying Terraform infrastructure to staging environment"
+        echo "VM does not exist. Deploying Terraform infrastructure to staging environment"
         
         # Initialize Terraform with remote backend configuration
         echo "Initializing Terraform configuration"
         terraform init
-        
-        # Check if resources already exist and handle accordingly
-        echo "Checking for existing resources..."
-        RESOURCE_GROUP_EXISTS=$(az group exists --name microapp-staging-rg)
-        echo "Resource group exists: $RESOURCE_GROUP_EXISTS"
-        
-        if [ "$RESOURCE_GROUP_EXISTS" = "true" ]; then
-          echo "Resource group already exists - performing incremental update"
-          echo "⚠️ PRESERVING IP ADDRESS: Not deleting resource group to maintain static IP"
-          echo "This will update existing resources or create missing ones"
-        else
-          echo "No existing resource group found - proceeding with fresh deployment"
-        fi
         
         # Generate execution plan using staging variables
         echo "Generating Terraform execution plan"
@@ -160,7 +191,9 @@ jobs:
         
     - name: Verify deployed VM infrastructure
       run: |
-        echo "Verifying deployed VM infrastructure and prerequisites"
+        echo "Verifying VM infrastructure and prerequisites"
+        echo "VM exists: ${{ env.VM_EXISTS }}"
+        echo "VM IP: ${{ env.VM_IP }}"
         
         # Configure SSH access for remote verification
         mkdir -p ~/.ssh
@@ -170,11 +203,19 @@ jobs:
         
         # Wait for VM to be fully ready with extended timeout
         echo "Waiting for VM to be fully ready for SSH connections..."
-        echo "VM IP: ${{ env.VM_IP }}"
         
-        # Extended retry loop - up to 15 minutes (cloud-init can take time)
-        for i in {1..90}; do
-          echo "SSH connection attempt $i/90..."
+        # Extended retry loop - up to 15 minutes (cloud-init can take time for new VMs)
+        MAX_ATTEMPTS=90
+        if [ "${{ env.VM_EXISTS }}" == "true" ]; then
+          # For existing VMs, reduce wait time
+          MAX_ATTEMPTS=30
+          echo "Using shorter timeout for existing VM (5 minutes)"
+        else
+          echo "Using full timeout for new VM (15 minutes)"
+        fi
+        
+        for i in $(seq 1 $MAX_ATTEMPTS); do
+          echo "SSH connection attempt $i/$MAX_ATTEMPTS..."
           
           # First check if the VM is reachable at all
           if timeout 5 bash -c "</dev/tcp/${{ env.VM_IP }}/22"; then
@@ -183,14 +224,14 @@ jobs:
               echo "SSH connection established successfully"
               break
             else
-              echo "Port 22 open but SSH not ready (likely cloud-init still running)"
+              echo "Port 22 open but SSH not ready"
             fi
           else
             echo "Port 22 not yet accessible"
           fi
           
-          if [ $i -eq 90 ]; then
-            echo "ERROR: VM failed to become SSH-ready after 15 minutes"
+          if [ $i -eq $MAX_ATTEMPTS ]; then
+            echo "ERROR: VM failed to become SSH-ready after timeout"
             echo "Let's gather some debugging information..."
             
             # Try to get VM status from Azure
@@ -203,7 +244,7 @@ jobs:
             
             exit 1
           fi
-          echo "Waiting 10 seconds... ($((i * 10))s elapsed out of 900s total)"
+          echo "Waiting 10 seconds... ($((i * 10))s elapsed)"
           sleep 10
         done
         
@@ -250,14 +291,6 @@ jobs:
           free -h
           df -h /
           
-          # Check cloud-init completion status
-          echo "Checking VM initialization status:"
-          if [ -f /home/azureuser/cloud-init-ready.txt ]; then
-            echo "Cloud-init completed: $(cat /home/azureuser/cloud-init-ready.txt)"
-          else
-            echo "Cloud-init status file not found"
-          fi
-          
           echo "Infrastructure setup and verification completed"
         EOF
         
@@ -266,11 +299,19 @@ jobs:
         
     - name: Complete staging infrastructure deployment
       run: |
-        echo "Staging infrastructure deployment completed successfully"
-        echo "Infrastructure deployment summary:"
-        echo "- VM provisioned and configured"
-        echo "- Docker environment verified and ready"
-        echo "- SSH access configured and validated"
+        if [ "${{ env.VM_EXISTS }}" == "true" ]; then
+          echo "Staging infrastructure validation completed successfully"
+          echo "Existing VM verified and ready for use"
+        else
+          echo "Staging infrastructure deployment completed successfully"
+          echo "New VM provisioned and configured"
+        fi
+        
+        echo ""
+        echo "Infrastructure summary:"
+        echo "- VM verified and configured"
+        echo "- Docker environment ready"
+        echo "- SSH access validated"
         echo "- Ready for application deployment"
         echo ""
         echo "Staging environment details:"
