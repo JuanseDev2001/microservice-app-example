@@ -60,6 +60,7 @@ jobs:
         
         echo "Security validation completed - no critical issues detected"
         echo "Note: Implement specific security scanning tools as needed"
+
   plan:
     name: Plan Infrastructure Changes
     runs-on: ubuntu-latest
@@ -97,6 +98,7 @@ jobs:
             repo: context.repo.repo,
             body: '## Infrastructure Deployment Plan\n\nValidation completed successfully\nInfrastructure changes are ready to apply to **staging** environment\n\nChanges will be applied automatically after PR merge.'
           })
+
   apply:
     name: Apply to Staging
     runs-on: ubuntu-latest
@@ -217,7 +219,6 @@ jobs:
         for i in $(seq 1 $MAX_ATTEMPTS); do
           echo "SSH connection attempt $i/$MAX_ATTEMPTS..."
           
-          # First check if the VM is reachable at all
           if timeout 5 bash -c "</dev/tcp/${{ env.VM_IP }}/22"; then
             echo "Port 22 is open, attempting SSH..."
             if ssh -i ~/.ssh/id_rsa -o ConnectTimeout=15 -o StrictHostKeyChecking=no azureuser@${{ env.VM_IP }} "echo 'SSH test successful' && exit 0" 2>/dev/null; then
@@ -237,57 +238,36 @@ jobs:
             # Try to get VM status from Azure
             echo "Checking VM power state..."
             az vm get-instance-view --resource-group microapp-staging-rg --name microapp-staging-vm --query "instanceView.statuses[1].displayStatus" -o tsv || echo "Failed to get VM status"
-            
-            # Check if port 22 is reachable
-            echo "Testing port 22 connectivity..."
             timeout 10 bash -c "</dev/tcp/${{ env.VM_IP }}/22" && echo "Port 22 is reachable" || echo "Port 22 is not reachable"
-            
             exit 1
           fi
           echo "Waiting 10 seconds... ($((i * 10))s elapsed)"
           sleep 10
         done
         
-        # Execute infrastructure setup and verification on remote VM
         echo "Running infrastructure setup and verification on VM..."
         ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no azureuser@${{ env.VM_IP }} << 'EOF'
           echo "SSH connection to staging VM established successfully"
           
-          # Install Docker (moved from cloud-init for faster VM startup)
-          echo "Installing Docker..."
+          # Install Docker
           if ! command -v docker &> /dev/null; then
             curl -fsSL https://get.docker.com -o get-docker.sh
             sudo sh get-docker.sh
             sudo systemctl start docker
             sudo systemctl enable docker
             sudo usermod -aG docker azureuser
-            echo "Docker installation completed"
-          else
-            echo "Docker already installed"
           fi
           
           # Install Docker Compose
-          echo "Installing Docker Compose..."
           if ! command -v docker-compose &> /dev/null; then
             sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
             sudo chmod +x /usr/local/bin/docker-compose
-            echo "Docker Compose installation completed"
-          else
-            echo "Docker Compose already installed"
           fi
           
-          # Verify installations
-          echo "Verifying Docker installation:"
           docker --version
-          
-          echo "Verifying Docker Compose installation:"
           docker-compose --version
           
-          # Create project directory
           mkdir -p /home/azureuser/microservice-app
-          
-          # Verify system resources
-          echo "System resource verification:"
           free -h
           df -h /
           
