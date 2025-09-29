@@ -133,7 +133,33 @@ jobs:
         echo "Resource group exists: $RESOURCE_GROUP_EXISTS"
         
         if [ "$RESOURCE_GROUP_EXISTS" = "true" ]; then
-          echo "Resource group already exists - performing incremental update"
+          echo "Resource group already exists - checking if it's in Terraform state"
+          
+          # Try to refresh state and see if import is needed
+          if ! terraform plan -var-file="staging.tfvars" -detailed-exitcode; then
+            PLAN_EXIT_CODE=$?
+            if [ $PLAN_EXIT_CODE -eq 1 ]; then
+              echo "Terraform plan failed - likely need to import existing resources"
+              
+              echo "Attempting to import existing resource group..."
+              RG_ID="/subscriptions/$(az account show --query id -o tsv)/resourceGroups/microapp-staging-rg"
+              
+              # Import resource group if not in state
+              terraform import -var-file="staging.tfvars" azurerm_resource_group.rg "$RG_ID" || echo "Resource group already in state or import failed"
+              
+              # Try importing other common resources
+              echo "Checking for other existing resources to import..."
+              
+              # Public IP (most important to preserve)
+              if az network public-ip show --resource-group microapp-staging-rg --name microapp-staging-public-ip &>/dev/null; then
+                echo "Importing existing public IP to preserve IP address..."
+                terraform import -var-file="staging.tfvars" azurerm_public_ip.public_ip "$RG_ID/providers/Microsoft.Network/publicIPAddresses/microapp-staging-public-ip" || echo "Public IP import failed or already imported"
+              fi
+              
+              echo "Import attempts completed. Continuing with plan..."
+            fi
+          fi
+          
           echo "⚠️ PRESERVING IP ADDRESS: Not deleting resource group to maintain static IP"
           echo "This will update existing resources or create missing ones"
         else
