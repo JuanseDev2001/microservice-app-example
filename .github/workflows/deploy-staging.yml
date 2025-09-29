@@ -125,7 +125,7 @@ jobs:
           # Clone/update repository
           if [ ! -d ".git" ]; then
             echo "Cloning repository..."
-            git clone https://github.com/JuanseDev2001/microservice-app-example.git .
+            git clone -b env/staging https://github.com/JuanseDev2001/microservice-app-example.git .
           else
             echo "Updating repository..."
             git pull origin env/staging
