@@ -128,15 +128,15 @@ jobs:
       
     - name: Deploy to staging
       run: |
-        echo "🚀 Deploying to staging environment..."
+        echo "Deploying to staging environment..."
         # Here you would typically deploy to your staging server
-        echo "✅ Staging deployment completed"
+        echo "Staging deployment completed"
         
     - name: Run integration tests
       run: |
-        echo "🧪 Running integration tests on staging..."
+        echo "Running integration tests on staging..."
         # Add your integration tests here
-        echo "✅ Integration tests passed"
+        echo "Integration tests passed"
 
   deploy-production:
     name: Deploy to Production
@@ -151,12 +151,12 @@ jobs:
       
     - name: Deploy to production
       run: |
-        echo "🚀 Deploying to production environment..."
+        echo "Deploying to production environment..."
         # Here you would typically deploy to your production server
-        echo "✅ Production deployment completed"
+        echo "Production deployment completed"
         
     - name: Post-deployment verification
       run: |
-        echo "🔍 Running post-deployment verification..."
+        echo "Running post-deployment verification..."
         # Add your production health checks here
-        echo "✅ Production deployment verified"
+        echo "Production deployment verified"

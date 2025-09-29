@@ -17,27 +17,27 @@ jobs:
       
     - name: Validate Docker Compose files
       run: |
-        echo "🔍 Validating production infrastructure configuration..."
+        echo "Validating production infrastructure configuration..."
         
         # Check if docker-compose files exist and are valid
         if [ -f "infrastructure/docker-compose.production.yml" ]; then
           docker-compose -f infrastructure/docker-compose.production.yml config
         else
-          echo "⚠️ No production docker-compose file found"
+          echo "No production docker-compose file found"
         fi
         
         # Validate main docker-compose
         docker-compose config
         
-        echo "✅ Production infrastructure validation completed"
+        echo "Production infrastructure validation completed"
         
     - name: Security and compliance checks
       run: |
-        echo "🛡️ Running production security and compliance checks..."
+        echo "Running production security and compliance checks..."
         echo "- Checking for production-ready configurations"
         echo "- Validating security policies"
         echo "- Verifying compliance requirements"
-        echo "✅ Security and compliance checks passed"
+        echo "Security and compliance checks passed"
 
   plan:
     name: Plan Production Changes
@@ -51,12 +51,12 @@ jobs:
       
     - name: Generate production deployment plan
       run: |
-        echo "📋 Generating PRODUCTION infrastructure deployment plan..."
-        echo "## 🚨 PRODUCTION Infrastructure Changes" >> $GITHUB_STEP_SUMMARY
+        echo "Generating PRODUCTION infrastructure deployment plan..."
+        echo "## PRODUCTION Infrastructure Changes" >> $GITHUB_STEP_SUMMARY
         echo "- Docker Compose configuration updates" >> $GITHUB_STEP_SUMMARY
         echo "- Production service configuration changes" >> $GITHUB_STEP_SUMMARY
         echo "- Critical environment variable updates" >> $GITHUB_STEP_SUMMARY
-        echo "⚠️ **PRODUCTION IMPACT**: Plan will be applied after PR merge and manual approval" >> $GITHUB_STEP_SUMMARY
+        echo "**PRODUCTION IMPACT**: Plan will be applied after PR merge and manual approval" >> $GITHUB_STEP_SUMMARY
         
     - name: Comment PR with production plan
       if: github.event_name == 'pull_request'
@@ -67,7 +67,7 @@ jobs:
             issue_number: context.issue.number,
             owner: context.repo.owner,
             repo: context.repo.repo,
-            body: '## 🚨 PRODUCTION Infrastructure Deployment Plan\n\n✅ Validation passed\n🔧 Ready to apply infrastructure changes to **PRODUCTION**\n\n⚠️ **This will affect production services!**\n\nChanges will be applied automatically after:\n1. PR merge\n2. Manual approval in GitHub environments\n\n**Please review carefully before proceeding.**'
+            body: '## PRODUCTION Infrastructure Deployment Plan\n\n Validation passed\n Ready to apply infrastructure changes to **PRODUCTION**\n\n **This will affect production services!**\n\nChanges will be applied automatically after:\n1. PR merge\n2. Manual approval in GitHub environments\n\n**Please review carefully before proceeding.**'
           })
 
   apply:
@@ -83,14 +83,14 @@ jobs:
       
     - name: Pre-deployment backup
       run: |
-        echo "💾 Creating pre-deployment backup..."
+        echo "Creating pre-deployment backup..."
         # Here you would typically backup your production data/config
-        echo "✅ Backup completed"
+        echo "Backup completed"
         
     - name: Apply infrastructure changes to production
       run: |
-        echo "🚀 Applying infrastructure changes to PRODUCTION..."
-        echo "⚠️ This is a PRODUCTION deployment - proceed with caution"
+        echo "Applying infrastructure changes to PRODUCTION..."
+        echo "This is a PRODUCTION deployment - proceed with caution"
         
         # Stop existing services gracefully
         docker-compose down || true
@@ -103,37 +103,37 @@ jobs:
         fi
         
         sleep 60  # Longer wait for production
-        echo "✅ Infrastructure applied to production"
+        echo "Infrastructure applied to production"
         
     - name: Production health checks
       run: |
-        echo "🏥 Running comprehensive production health checks..."
+        echo "Running comprehensive production health checks..."
         
         # Check all services are running
         docker-compose ps
         
         # Comprehensive health checks
-        curl -f http://localhost:9083 || (echo "❌ Frontend health check failed" && exit 1)
-        curl -f http://localhost:9081/users/cache/stats || (echo "❌ Users API health check failed" && exit 1)
+        curl -f http://localhost:9083 || (echo "Frontend health check failed" && exit 1)
+        curl -f http://localhost:9081/users/cache/stats || (echo "Users API health check failed" && exit 1)
         
         # Additional production checks
-        echo "🔍 Running additional production verification..."
+        echo "Running additional production verification..."
         timeout 30s bash -c 'while [[ "$(curl -s -o /dev/null -w ''%{http_code}'' http://localhost:9083)" != "200" ]]; do sleep 1; done' || (echo "❌ Frontend readiness check failed" && exit 1)
         
-        echo "✅ All production health checks passed"
+        echo "All production health checks passed"
         
     - name: Post-deployment monitoring
       run: |
-        echo "📊 Setting up post-deployment monitoring..."
+        echo "Setting up post-deployment monitoring..."
         # Here you would typically:
         # - Set up alerts
         # - Start monitoring dashboards
         # - Configure log aggregation
-        echo "✅ Monitoring configured"
+        echo "Monitoring configured"
         
     - name: Notify production deployment
       run: |
-        echo "🎉 PRODUCTION infrastructure deployment completed successfully!"
-        echo "📊 Production services status:" 
+        echo "PRODUCTION infrastructure deployment completed successfully!"
+        echo "Production services status:" 
         docker-compose ps --format "table {{.Name}}\t{{.Status}}\t{{.Ports}}"
-        echo "⚠️ Continue monitoring for the next 30 minutes"
+        echo "Continue monitoring for the next 30 minutes"
