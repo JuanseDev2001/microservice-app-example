@@ -124,12 +124,18 @@ jobs:
           
           # Clone/update repository
           if [ ! -d ".git" ]; then
-            echo "Cloning repository..."
+            echo "Cloning repository on branch env/staging..."
             git clone -b env/staging https://github.com/JuanseDev2001/microservice-app-example.git .
           else
             echo "Updating repository..."
-            git pull origin env/staging
+            git fetch origin env/staging
+            git checkout env/staging
+            git reset --hard origin/env/staging
           fi
+
+          echo "Files in repo after clone/pull:"
+          ls -l
+
           
           # Fix Docker installation if needed
           if ! docker --version &>/dev/null; then
