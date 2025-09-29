@@ -83,7 +83,7 @@ jobs:
           echo "4. SSH service not running"
           exit 1
         fi
-        echo "✅ SSH port 22 is accessible"
+        echo " SSH port 22 is accessible"
         
         # Configure SSH access
         mkdir -p ~/.ssh
@@ -112,7 +112,7 @@ jobs:
           exit 1
         fi
         
-        echo "✅ All connectivity tests passed! Proceeding with deployment..."
+        echo " All connectivity tests passed! Proceeding with deployment..."
         
         # Deploy applications via SSH
         ssh -i ~/.ssh/id_rsa -o StrictHostKeyChecking=no azureuser@${{ env.VM_IP }} << 'EOF'
@@ -204,14 +204,14 @@ jobs:
           echo "Testing $name at $url..."
           
           if curl -f -m 10 $url > /dev/null 2>&1; then
-            echo "✅ $name is responding"
+            echo " $name is responding"
           else
-            echo "❌ $name is not responding (this might be expected if service doesn't have health endpoint)"
+            echo "\ $name is not responding (this might be expected if service doesn't have health endpoint)"
           fi
         done
         
         echo ""
-        echo "🎉 Deployment completed! Services should be available at:"
+        echo " Deployment completed! Services should be available at:"
         echo "Frontend: http://${{ env.VM_IP }}:9083"
         echo "Auth API: http://${{ env.VM_IP }}:9080"
         echo "Users API: http://${{ env.VM_IP }}:9081"
