@@ -1,6 +1,6 @@
 # Configuración de Branch Protection
 
-## 🛡️ Branch Protection Rules
+## Branch Protection Rules
 
 Para configurar las reglas de protección de branches en GitHub:
 
@@ -14,19 +14,19 @@ Settings -> Branches -> Add rule
 Branch name pattern: main
 
 Configuración recomendada:
-☑️ Require pull request reviews before merging
+   Require pull request reviews before merging
   - Required approving reviews: 1
   - Dismiss stale PR approvals when new commits are pushed
-☑️ Require status checks to pass before merging
+   Require status checks to pass before merging
   - Require branches to be up to date before merging
   - Status checks required:
     - CI/CD Pipeline / test
     - CI/CD Pipeline / build
     - CI/CD Pipeline / docker
-☑️ Require branches to be up to date before merging
-☑️ Include administrators
-☑️ Allow force pushes: false
-☑️ Allow deletions: false
+   Require branches to be up to date before merging
+   Include administrators
+   Allow force pushes: false
+   Allow deletions: false
 ```
 
 ### 2. Staging Environment Branch Protection
@@ -39,16 +39,16 @@ Settings -> Branches -> Add rule
 Branch name pattern: env/staging
 
 Configuración recomendada:
-☑️ Require pull request reviews before merging
+   Require pull request reviews before merging
   - Required approving reviews: 1
-☑️ Require status checks to pass before merging
+   Require status checks to pass before merging
   - Status checks required:
     - Infrastructure Pipeline - Staging / validate
     - Infrastructure Pipeline - Staging / plan
-☑️ Restrict pushes that create files
-☑️ Include administrators
-☑️ Allow force pushes: false
-☑️ Allow deletions: false
+   Restrict pushes that create files
+   Include administrators
+   Allow force pushes: false
+   Allow deletions: false
 ```
 
 ### 3. Production Environment Branch Protection
@@ -61,21 +61,21 @@ Settings -> Branches -> Add rule
 Branch name pattern: env/production
 
 Configuración recomendada:
-☑️ Require pull request reviews before merging
+   Require pull request reviews before merging
   - Required approving reviews: 2 (mínimo)
   - Require review from CODEOWNERS
-☑️ Require status checks to pass before merging
+   Require status checks to pass before merging
   - Status checks required:
     - Infrastructure Pipeline - Production / validate
     - Infrastructure Pipeline - Production / plan
-☑️ Restrict pushes that create files
-☑️ Require signed commits
-☑️ Include administrators
-☑️ Allow force pushes: false
-☑️ Allow deletions: false
+   Restrict pushes that create files
+    Require signed commits
+    Include administrators
+    Allow force pushes: false
+    Allow deletions: false
 ```
 
-## 🔐 Environment Protection Rules
+## Environment Protection Rules
 
 ### Staging Environment
 ```yaml
@@ -96,7 +96,7 @@ Protection rules:
 - Prevent self-review: true
 ```
 
-## 📝 Comandos para configurar vía GitHub CLI
+## Comandos para configurar vía GitHub CLI
 
 ```bash
 # Instalar GitHub CLI si no está instalado
@@ -127,7 +127,7 @@ gh api repos/:owner/:repo/branches/env/production/protection \
   --field restrictions=null
 ```
 
-## 🔄 Workflow de Branches
+## Workflow de Branches
 
 ```
 main (desarrollo)
@@ -144,14 +144,14 @@ env/production (production deployment)
 └── Trigger: Infrastructure Pipeline - Production
 ```
 
-## ⚙️ Scripts de Automatización
+## Scripts de Automatización
 
 ### Crear branches de entorno
 ```bash
 #!/bin/bash
 # create-environment-branches.sh
 
-echo "🔧 Creando branches de entorno..."
+echo "Creando branches de entorno..."
 
 # Crear branch de staging
 git checkout -b env/staging
@@ -164,7 +164,7 @@ git push -u origin env/production
 # Volver a main
 git checkout main
 
-echo "✅ Branches de entorno creados"
+echo "Branches de entorno creados"
 ```
 
 ### Sincronizar entornos
@@ -172,13 +172,13 @@ echo "✅ Branches de entorno creados"
 #!/bin/bash
 # sync-environments.sh
 
-echo "🔄 Sincronizando entornos..."
+echo "Sincronizando entornos..."
 
 # Sincronizar staging con main
 git checkout env/staging
 git merge main
 git push origin env/staging
 
-echo "✅ Staging sincronizado"
-echo "⚠️  Para production, usar Pull Request manual"
+echo "Staging sincronizado"
+echo "Para production, usar Pull Request manual"
 ```

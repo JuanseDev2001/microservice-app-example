@@ -1,24 +1,24 @@
-# 🚀 CI/CD Pipeline Automation
+# CI/CD Pipeline Automation
 
 Este proyecto incluye pipelines de CI/CD completamente automatizados usando GitHub Actions para desplegar la aplicación de microservicios en Azure.
 
-## 📋 Características del Pipeline
+## Características del Pipeline
 
-### 🏗️ Pipeline de Infraestructura (`infrastructure.yml`)
+### Pipeline de Infraestructura (`infrastructure.yml`)
 - **Terraform** para Infrastructure as Code
 - Despliegue automático de VM en Azure
 - Soporte para múltiples entornos (staging/production)
 - Validación y formateo de código Terraform
 - Almacenamiento de estado remoto
 
-### 🚢 Pipeline de Aplicación (`deploy.yml`)
+### Pipeline de Aplicación (`deploy.yml`)
 - Build automático de imágenes Docker
 - Tests de integración
 - Despliegue con Docker Compose
 - Smoke tests post-despliegue
 - Rollback automático en caso de fallo
 
-### 🔄 Pipeline Completo (`full-pipeline.yml`)
+### Pipeline Completo (`full-pipeline.yml`)
 - Orquestación de infraestructura y aplicación
 - Despliegue end-to-end automatizado
 - Soporte para despliegues manuales
@@ -44,7 +44,7 @@ chmod +x scripts/setup-cicd.sh
 2. Crea entornos: `staging` y `production`
 3. Configura reglas de protección
 
-## 🚀 Usar los Pipelines
+## Usar los Pipelines
 
 ### Despliegue Automático
 ```bash
@@ -66,7 +66,7 @@ git push origin main
 1. Actions → "Application Deployment"
 2. Especifica VM IP si es necesario
 
-## 🌍 Entornos
+## Entornos
 
 ### Staging
 - **Branch**: `env/staging`
@@ -78,7 +78,7 @@ git push origin main
 - **Protección**: Requiere aprobación
 - **URL**: `http://<vm-ip>:9083`
 
-## 📊 Monitoreo
+## Monitoreo
 
 ### Logs de Despliegue
 - GitHub Actions proporciona logs detallados
@@ -90,7 +90,7 @@ git push origin main
 - Tests de conectividad Redis
 - Validación de endpoints HTTP
 
-## 🔧 Troubleshooting
+## Troubleshooting
 
 ### Fallo en Terraform
 ```bash
@@ -114,7 +114,7 @@ docker compose logs
 2. Validar permisos del Service Principal
 3. Comprobar SSH key format
 
-## 🔄 Workflow Triggers
+## Workflow Triggers
 
 ### Automáticos
 - **Push a main**: Despliegue completo a staging
@@ -126,7 +126,7 @@ docker compose logs
 - **Selección de entorno**: staging/production
 - **Acciones específicas**: plan/apply/destroy
 
-## 📈 Mejoras Futuras
+## Mejoras Futuras
 
 - [ ] Integration con Azure DevOps
 - [ ] Monitoring con Application Insights
@@ -135,7 +135,7 @@ docker compose logs
 - [ ] Auto-scaling basado en métricas
 - [ ] Backup automático de base de datos
 
-## 🛡️ Seguridad
+## Seguridad
 
 - Service Principal con permisos mínimos
 - Secrets encriptados en GitHub
