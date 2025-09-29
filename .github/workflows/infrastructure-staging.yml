@@ -133,82 +133,8 @@ jobs:
         echo "Resource group exists: $RESOURCE_GROUP_EXISTS"
         
         if [ "$RESOURCE_GROUP_EXISTS" = "true" ]; then
-          echo "Resource group already exists - checking if it's in Terraform state"
-          
-          # Get subscription and resource group ID for imports
-          SUBSCRIPTION_ID=$(az account show --query id -o tsv)
-          RG_ID="/subscriptions/$SUBSCRIPTION_ID/resourceGroups/microapp-staging-rg"
-          
-          echo "Checking if resource group is in Terraform state..."
-          if ! terraform state show azurerm_resource_group.rg &>/dev/null; then
-            echo "Resource group not in state - importing..."
-            terraform import -var-file="staging.tfvars" azurerm_resource_group.rg "$RG_ID"
-          else
-            echo "Resource group already in Terraform state"
-          fi
-          
-          # Import other critical resources if they exist but aren't in state
-          echo "Checking for other existing resources to import..."
-          
-          # Virtual Network
-          if az network vnet show --resource-group microapp-staging-rg --name microapp-staging-vnet &>/dev/null; then
-            if ! terraform state show azurerm_virtual_network.vnet &>/dev/null; then
-              echo "Importing existing virtual network..."
-              terraform import -var-file="staging.tfvars" azurerm_virtual_network.vnet "$RG_ID/providers/Microsoft.Network/virtualNetworks/microapp-staging-vnet"
-            fi
-          fi
-          
-          # Subnet
-          if az network vnet subnet show --resource-group microapp-staging-rg --vnet-name microapp-staging-vnet --name microapp-staging-subnet &>/dev/null; then
-            if ! terraform state show azurerm_subnet.subnet &>/dev/null; then
-              echo "Importing existing subnet..."
-              terraform import -var-file="staging.tfvars" azurerm_subnet.subnet "$RG_ID/providers/Microsoft.Network/virtualNetworks/microapp-staging-vnet/subnets/microapp-staging-subnet"
-            fi
-          fi
-          
-          # Network Security Group
-          if az network nsg show --resource-group microapp-staging-rg --name microapp-staging-nsg &>/dev/null; then
-            if ! terraform state show azurerm_network_security_group.nsg &>/dev/null; then
-              echo "Importing existing network security group..."
-              terraform import -var-file="staging.tfvars" azurerm_network_security_group.nsg "$RG_ID/providers/Microsoft.Network/networkSecurityGroups/microapp-staging-nsg"
-            fi
-          fi
-          
-          # Public IP - Critical to preserve IP address
-          if az network public-ip show --resource-group microapp-staging-rg --name microapp-staging-public-ip &>/dev/null; then
-            if ! terraform state show azurerm_public_ip.public_ip &>/dev/null; then
-              echo "Importing existing public IP to preserve IP address..."
-              terraform import -var-file="staging.tfvars" azurerm_public_ip.public_ip "$RG_ID/providers/Microsoft.Network/publicIPAddresses/microapp-staging-public-ip"
-            fi
-          fi
-          
-          # Network Interface
-          if az network nic show --resource-group microapp-staging-rg --name microapp-staging-nic &>/dev/null; then
-            if ! terraform state show azurerm_network_interface.nic &>/dev/null; then
-              echo "Importing existing network interface..."
-              terraform import -var-file="staging.tfvars" azurerm_network_interface.nic "$RG_ID/providers/Microsoft.Network/networkInterfaces/microapp-staging-nic"
-            fi
-          fi
-          
-          # Virtual Machine
-          if az vm show --resource-group microapp-staging-rg --name microapp-staging-vm &>/dev/null; then
-            if ! terraform state show azurerm_linux_virtual_machine.vm &>/dev/null; then
-              echo "Importing existing virtual machine..."
-              terraform import -var-file="staging.tfvars" azurerm_linux_virtual_machine.vm "$RG_ID/providers/Microsoft.Compute/virtualMachines/microapp-staging-vm"
-            fi
-          fi
-          
-          # Network Interface Security Group Association
-          if az network nic show --resource-group microapp-staging-rg --name microapp-staging-nic &>/dev/null && az network nsg show --resource-group microapp-staging-rg --name microapp-staging-nsg &>/dev/null; then
-            if ! terraform state show azurerm_network_interface_security_group_association.nsg_association &>/dev/null; then
-              echo "Importing existing network interface security group association..."
-              NIC_ID="$RG_ID/providers/Microsoft.Network/networkInterfaces/microapp-staging-nic"
-              NSG_ID="$RG_ID/providers/Microsoft.Network/networkSecurityGroups/microapp-staging-nsg"
-              terraform import -var-file="staging.tfvars" azurerm_network_interface_security_group_association.nsg_association "$NIC_ID|$NSG_ID" || echo "NSG association import skipped (may not exist or already imported)"
-            fi
-          fi
-          
-          echo "PRESERVING IP ADDRESS: All existing resources checked and imported if needed"
+          echo "Resource group already exists - performing incremental update"
+          echo "⚠️ PRESERVING IP ADDRESS: Not deleting resource group to maintain static IP"
           echo "This will update existing resources or create missing ones"
         else
           echo "No existing resource group found - proceeding with fresh deployment"
