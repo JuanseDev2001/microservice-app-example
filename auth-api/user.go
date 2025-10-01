@@ -20,10 +20,10 @@ var allowedUserHashes = map[string]interface{}{
 var userAPICircuitBreaker *gobreaker.CircuitBreaker = gobreaker.NewCircuitBreaker(gobreaker.Settings{
 	Name:        "UserAPI",
 	MaxRequests: 3,
-	Interval:    0,
-	Timeout:     5,
+	Interval:    60, 
+	Timeout:     30,
 	ReadyToTrip: func(counts gobreaker.Counts) bool {
-		return counts.ConsecutiveFailures > 5
+		return counts.ConsecutiveFailures > 3
 	},
 })
 

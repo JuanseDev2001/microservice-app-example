@@ -160,18 +160,6 @@ The project implements a **fully automated DevOps pipeline** using GitHub Action
 
 ### Deployment Architecture
 
-#### **Container Orchestration**:
-```yaml
-# Service Dependencies Flow:
-Redis (6379)
-  ↓
-Users API (9081) ← Auth API (9080)
-  ↓                    ↓
-TODOs API (9082) ← Frontend (9083)
-  ↓
-Log Processor (background)
-```
-
 #### **Network Communication**:
 - **Internal**: Services communicate via Docker network using service names
 - **External**: Public access through Azure VM's public IP
@@ -239,13 +227,13 @@ Once deployed, access services at:
 The application implements several **microservice design patterns** for resilience, performance, and reliability:
 
 ### 1. **Circuit Breaker Pattern** 🔧
-**Location**: TODOs API (`todoController.js`)
-**Library**: Opossum Circuit Breaker
-**Purpose**: Prevents cascading failures when Redis logging service is unavailable
+**Location**: TODOs API (`todoController.js`) & Auth API (`user.go`)
+**Libraries**: Opossum Circuit Breaker (Node.js) & GoBreaker (Go)
+**Purpose**: Prevents cascading failures when downstream services become unavailable
 
-#### Implementation:
+#### TODOs API Implementation (Node.js):
 ```javascript
-// Circuit breaker configuration
+// Circuit breaker configuration for Redis logging
 this._redisBreaker = new CircuitBreaker(
     (message) => {
         return new Promise((resolve, reject) => {
@@ -264,18 +252,51 @@ this._redisBreaker = new CircuitBreaker(
 );
 ```
 
-#### Features:
+#### Auth API Implementation (Go):
+```go
+// Circuit breaker configuration for Users API calls
+var userAPICircuitBreaker *gobreaker.CircuitBreaker = gobreaker.NewCircuitBreaker(gobreaker.Settings{
+    Name:        "UserAPI",
+    MaxRequests: 3,                      // Max requests in half-open state
+    Interval:    60,                     // Clear counts every 60 seconds
+    Timeout:     30,                     // Stay open for 30 seconds
+    ReadyToTrip: func(counts gobreaker.Counts) bool {
+        return counts.ConsecutiveFailures > 3  // Trip after 3 consecutive failures
+    },
+})
+
+```
+
+#### Multi-Service Circuit Breaker Features:
+
+**TODOs API (Redis Protection)**:
 - **Timeout Protection**: Prevents hanging on Redis publish operations (2s timeout)
 - **Error Threshold**: Opens circuit when 10% of calls fail
 - **Auto Recovery**: Attempts reconnection every 10 seconds
 - **Graceful Degradation**: Continues TODO operations even if logging fails
 - **Fallback Mechanism**: Returns "Redis no disponible" when circuit is open
 
+**Auth API (Users API Protection)**:
+- **Request Limiting**: Maximum 3 requests during half-open state
+- **Failure Threshold**: Trips after 3 consecutive failures to Users API
+- **Timeout Management**: Stays open for 30 seconds before retry
+- **State Monitoring**: Tracks consecutive failures and success rates
+- **Fast Failure**: Immediate error response when circuit is open
+
+#### Circuit Breaker States:
+
+| State | Behavior | When It Occurs |
+|-------|----------|----------------|
+| **Closed** | Normal operation, all requests pass through | Default state, system healthy |
+| **Open** | All requests fail immediately, no calls to downstream | After threshold failures reached |
+| **Half-Open** | Limited test requests allowed | After timeout period expires |
+
 #### Benefits:
-- **Prevents System Overload**: Stops calling failed Redis service
+- **Prevents System Overload**: Stops calling failed downstream services
 - **Fast Failure**: Immediate response when circuit is open
 - **Self-Healing**: Automatically retries when service recovers
-- **User Experience**: TODO operations continue working
+- **User Experience**: Core operations continue working despite partial failures
+- **Resource Protection**: Prevents thread/connection pool exhaustion
 
 ### 2. **Cache-Aside Pattern** 💾
 **Location**: TODOs API (`todoController.js`)  
@@ -319,7 +340,7 @@ _setTodoData(userID, data) {
 
 | Pattern | Purpose | Benefit | Implementation |
 |---------|---------|---------|----------------|
-| **Circuit Breaker** | Fault tolerance | Prevents cascade failures | Opossum library with Redis |
+| **Circuit Breaker** | Fault tolerance | Prevents cascade failures | Opossum (TODOs→Redis) & GoBreaker (Auth→Users) |
 | **Cache-Aside** | Performance | Fast data access | Memory-cache with user scoping |
 
 
